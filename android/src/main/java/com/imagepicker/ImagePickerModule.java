@@ -19,6 +19,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Log;
 import android.util.Patterns;
 import android.webkit.MimeTypeMap;
 import android.content.pm.PackageManager;
@@ -425,7 +426,7 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
         return;
     }
 
-    final ReadExifResult result = readExifInterface(responseHelper, imageConfig);
+    final ReadExifResult result = readExifInterface(responseHelper, imageConfig,uri,activity);
 
     if (result.error != null)
     {

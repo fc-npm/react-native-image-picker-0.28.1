@@ -1,6 +1,8 @@
 package com.imagepicker.utils;
 
+import android.app.Activity;
 import android.content.Context;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
@@ -8,6 +10,7 @@ import android.media.ExifInterface;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -20,12 +23,12 @@ import com.imagepicker.media.ImageConfig;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.TimeZone;
 import java.util.UUID;
 
@@ -236,8 +239,21 @@ public class MediaUtils
                 });
     }
 
+    //如果exif中获取不到，从Provider中读取
+    private static long read_DATE_ADDED_From_uri(Uri uri, Activity activity){
+        Cursor c = activity.getContentResolver().query(uri, null, null, null, null, null);
+        if (c ==null || c.getCount()<=0){
+            return -1;
+        }
+        c.moveToFirst();
+        long date_added = c.getLong(c.getColumnIndex(MediaStore.Images.ImageColumns.DATE_ADDED));
+        return date_added;
+    }
+
     public static ReadExifResult readExifInterface(@NonNull ResponseHelper responseHelper,
-                                                   @NonNull final ImageConfig imageConfig)
+                                                   @NonNull final ImageConfig imageConfig,
+                                                   @NonNull final Uri uri,
+                                                   @NonNull Activity activity)
     {
         ReadExifResult result;
         int currentRotation = 0;
@@ -270,6 +286,18 @@ public class MediaUtils
                 responseHelper.putString("timestamp", isoFormatString);
             }
             catch (Exception e) {}
+
+            //如果没有timestamp，从Provider中取
+            try{
+                if (!responseHelper.getResponse().hasKey("timestamp")){
+                    long date_added = read_DATE_ADDED_From_uri(uri,activity); //单位是秒
+                    Date date = new Date(date_added*1000);//这里单位是ms
+                    final String isoFormatString = new StringBuilder(isoFormat.format(date))
+                            .append("Z").toString();
+                    responseHelper.putString("timestamp", isoFormatString);
+                }
+            } catch (Exception e) {}
+
 
             int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
             boolean isVertical = true;
