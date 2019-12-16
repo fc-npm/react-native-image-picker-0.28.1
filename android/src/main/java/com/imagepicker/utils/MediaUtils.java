@@ -290,8 +290,8 @@ public class MediaUtils
             //如果没有timestamp，从Provider中取
             try{
                 if (!responseHelper.getResponse().hasKey("timestamp")){
-                    long date_added = read_DATE_ADDED_From_uri(uri,activity); //单位是秒
-                    Date date = new Date(date_added*1000);//这里单位是ms
+                    long date_added = read_DATE_ADDED_From_uri(uri,activity); //单位是ms
+                    Date date = new Date(date_added);//这里单位是ms
                     final String isoFormatString = new StringBuilder(isoFormat.format(date))
                             .append("Z").toString();
                     responseHelper.putString("timestamp", isoFormatString);
