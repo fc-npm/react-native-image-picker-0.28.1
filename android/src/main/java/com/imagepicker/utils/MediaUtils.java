@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -40,6 +41,7 @@ import static com.imagepicker.ImagePickerModule.REQUEST_LAUNCH_IMAGE_CAPTURE;
 
 public class MediaUtils
 {
+    private static final String TAG = "MediaUtils";
     public static @Nullable File createNewFile(@NonNull final Context reactContext,
                                                @NonNull final ReadableMap options,
                                                @NonNull final boolean forceLocal)
@@ -53,7 +55,7 @@ public class MediaUtils
                 && ReadableMapUtils.hasAndNotEmptyString(options.getMap("storageOptions"), "path")
                 ? new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), options.getMap("storageOptions").getString("path"))
                 : (!forceLocal ? Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                              : reactContext.getExternalFilesDir(Environment.DIRECTORY_PICTURES));
+                : reactContext.getExternalFilesDir(Environment.DIRECTORY_PICTURES));
 
         File result = new File(path, filename);
 
@@ -94,7 +96,7 @@ public class MediaUtils
 
         if (imageConfig.maxWidth != 0 || imageConfig.maxHeight != 0) {
             while ((imageConfig.maxWidth == 0 || initialWidth > 2 * imageConfig.maxWidth) &&
-                   (imageConfig.maxHeight == 0 || initialHeight > 2 * imageConfig.maxHeight)) {
+                    (imageConfig.maxHeight == 0 || initialHeight > 2 * imageConfig.maxHeight)) {
                 imageOptions.inSampleSize *= 2;
                 initialHeight /= 2;
                 initialWidth /= 2;
@@ -250,6 +252,29 @@ public class MediaUtils
         return date_added;
     }
 
+    //这个ts单位可能是秒（三星、android文档），可能是毫秒(小米上)。先尝试秒，再尝试毫秒
+    private static Date dateFromTS(long ts){
+        Calendar cal = Calendar.getInstance();
+
+        Date date = new Date(ts*1000);//先假设ts单位是秒
+        cal.setTime(date);
+        int year = cal.get(Calendar.YEAR);
+        android.util.Log.d(TAG, "dateFromTS: year0="+year);
+        if (year >= 1971 && year<=2100){
+            return date;
+        }
+
+        date = new Date(ts);//再假设ts单位是ms
+        cal.setTime(date);
+        year = cal.get(Calendar.YEAR);
+        android.util.Log.d(TAG, "dateFromTS: year1="+year);
+        if (year >= 1971 && year<=2100){
+            return date;
+        }
+
+        return null;
+    }
+
     public static ReadExifResult readExifInterface(@NonNull ResponseHelper responseHelper,
                                                    @NonNull final ImageConfig imageConfig,
                                                    @NonNull final Uri uri,
@@ -284,19 +309,28 @@ public class MediaUtils
                 final String isoFormatString = new StringBuilder(isoFormat.format(exifDatetimeFormat.parse(timestamp)))
                         .append("Z").toString();
                 responseHelper.putString("timestamp", isoFormatString);
+                android.util.Log.d(TAG, "readExifInterface exif中的timestamp: "+isoFormatString);
+
             }
-            catch (Exception e) {}
+            catch (Exception e) {
+                android.util.Log.d(TAG, "readExifInterface 读取exif中的timestamp异常 ",e);
+            }
 
             //如果没有timestamp，从Provider中取
             try{
                 if (!responseHelper.getResponse().hasKey("timestamp")){
                     long date_added = read_DATE_ADDED_From_uri(uri,activity); //单位是ms
-                    Date date = new Date(date_added);//这里单位是ms
+                    android.util.Log.d(TAG, "readExifInterface: date_added"+date_added);
+                    Date date = MediaUtils.dateFromTS(date_added);
+                    android.util.Log.d(TAG, "readExifInterface: date:"+date);
                     final String isoFormatString = new StringBuilder(isoFormat.format(date))
                             .append("Z").toString();
                     responseHelper.putString("timestamp", isoFormatString);
+                    android.util.Log.d(TAG, "readExifInterface date_added isoFormatString: "+isoFormatString);
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                android.util.Log.d(TAG, "readExifInterface date_added异常: ",e);
+            }
 
 
             int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
